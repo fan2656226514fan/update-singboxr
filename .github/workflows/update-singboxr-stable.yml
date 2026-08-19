@@ -1,0 +1,129 @@
+name: Update sing-box reF1nd stable arm64
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 3 * * *"
+
+
+permissions:
+  contents: write
+
+
+jobs:
+
+  stable:
+
+    runs-on: ubuntu-latest
+
+
+    steps:
+
+
+    - name: Checkout
+      uses: actions/checkout@v4
+
+
+
+    - name: Get stable release
+      id: version
+      run: |
+
+        TAG=$(curl -fsSL \
+        https://api.github.com/repos/reF1nd/sing-box-releases/releases \
+        | grep '"tag_name"' \
+        | grep -v beta \
+        | head -1 \
+        | cut -d '"' -f4)
+
+
+        echo "stable=$TAG"
+
+        echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+
+
+    - name: Download linux-arm64
+
+      run: |
+
+        URL=$(curl -fsSL \
+        https://api.github.com/repos/reF1nd/sing-box-releases/releases \
+        | grep browser_download_url \
+        | grep linux-arm64 \
+        | grep -v beta \
+        | head -1 \
+        | cut -d '"' -f4)
+
+
+        wget -O source.tar.gz "$URL"
+
+
+
+    - name: Pack
+
+      run: |
+
+        mkdir work output
+
+
+        tar -xzf source.tar.gz -C work
+
+
+        BIN=$(find work -name sing-box -type f | head -1)
+
+
+        cp "$BIN" output/sing-box
+
+
+        tar -czf \
+        sing-box-ref1nd-stable-linux-arm64.tar.gz \
+        -C output sing-box
+
+
+
+    - name: Save version
+
+      run: |
+
+        echo "${{steps.version.outputs.tag}}" \
+        > stable-version.txt
+
+
+
+    - name: Commit
+
+      run: |
+
+        git config user.name github-actions
+
+        git config user.email github-actions@github.com
+
+
+        git add .
+
+
+        git commit \
+        -m "Update stable ${{steps.version.outputs.tag}}" \
+        || exit 0
+
+
+        git push
+
+
+
+    - name: Release stable
+
+      uses: softprops/action-gh-release@v2
+
+      with:
+
+        tag_name: stable
+
+        name: sing-box reF1nd stable
+
+        files: |
+
+          sing-box-ref1nd-stable-linux-arm64.tar.gz
+
+          stable-version.txt
