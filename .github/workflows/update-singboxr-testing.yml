@@ -1,0 +1,348 @@
+name: Update sing-box reF1nd testing arm64
+
+
+on:
+
+  workflow_dispatch:
+
+  schedule:
+
+    - cron: "0 2 * * *"
+
+
+
+permissions:
+
+  contents: write
+
+
+
+
+jobs:
+
+
+  testing:
+
+
+    runs-on: ubuntu-latest
+
+
+
+    steps:
+
+
+
+    - name: Checkout
+
+      uses: actions/checkout@v4
+
+
+
+
+
+    - name: Get latest beta version
+
+      id: version
+
+      shell: bash
+
+      run: |
+
+
+        TAG=$(curl -fsSL \
+        https://api.github.com/repos/reF1nd/sing-box-releases/releases \
+        | grep '"tag_name"' \
+        | grep beta \
+        | head -1 \
+        | cut -d '"' -f4)
+
+
+
+        if [ -z "$TAG" ]; then
+
+          echo "没有找到 beta 版本"
+
+          exit 1
+
+        fi
+
+
+
+        echo "最新 beta: $TAG"
+
+
+
+        echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+
+
+
+
+
+    - name: Download linux-arm64 beta
+
+      shell: bash
+
+      run: |
+
+
+        URL=$(curl -fsSL \
+        https://api.github.com/repos/reF1nd/sing-box-releases/releases \
+        | grep browser_download_url \
+        | grep linux-arm64 \
+        | grep beta \
+        | head -1 \
+        | cut -d '"' -f4)
+
+
+
+        if [ -z "$URL" ]; then
+
+          echo "没有找到 linux-arm64 beta"
+
+          exit 1
+
+        fi
+
+
+
+        echo "下载地址:"
+
+        echo "$URL"
+
+
+
+        wget -O source.tar.gz "$URL"
+
+
+
+
+
+
+
+    - name: Extract and repack
+
+      shell: bash
+
+      run: |
+
+
+        rm -rf work output
+
+
+
+        mkdir work output
+
+
+
+
+        tar -xzf source.tar.gz -C work
+
+
+
+
+
+        BIN=$(find work -name sing-box -type f | head -1)
+
+
+
+
+        if [ ! -f "$BIN" ]; then
+
+          echo "未找到 sing-box"
+
+          exit 1
+
+        fi
+
+
+
+
+        chmod +x "$BIN"
+
+
+
+
+        echo "内核信息:"
+
+        file "$BIN"
+
+
+
+
+
+        # 删除旧 beta 文件
+
+        rm -f sing-box-ref1nd-testing-linux-arm64.tar.gz
+
+
+
+
+
+
+        cp "$BIN" output/sing-box
+
+
+
+
+
+
+        tar -czf \
+        sing-box-ref1nd-testing-linux-arm64.tar.gz \
+        -C output sing-box
+
+
+
+
+
+        ls -lh sing-box-ref1nd-testing-linux-arm64.tar.gz
+
+
+
+
+
+
+
+
+    - name: Save version
+
+      shell: bash
+
+      run: |
+
+
+        echo "${{ steps.version.outputs.tag }}" \
+        > testing-version.txt
+
+
+
+
+
+
+
+    - name: Commit update
+
+      shell: bash
+
+      run: |
+
+
+        git config user.name github-actions
+
+        git config user.email github-actions@github.com
+
+
+
+
+        git add .
+
+
+
+
+        git commit \
+        -m "Update testing ${{ steps.version.outputs.tag }}" \
+        || exit 0
+
+
+
+
+        git push
+
+
+
+
+
+
+
+    - name: Delete old testing Release
+
+      uses: actions/github-script@v7
+
+
+      with:
+
+
+        script: |
+
+
+          const releases =
+          await github.rest.repos.listReleases({
+
+            owner: context.repo.owner,
+
+            repo: context.repo.repo
+
+          });
+
+
+
+
+          for (const release of releases.data) {
+
+
+
+            if (release.tag_name === "testing") {
+
+
+
+              await github.rest.repos.deleteRelease({
+
+                owner: context.repo.owner,
+
+                repo: context.repo.repo,
+
+                release_id: release.id
+
+              });
+
+
+
+              console.log("删除旧 testing Release");
+
+            }
+
+          }
+
+
+
+
+
+
+
+    - name: Create testing Release
+
+      uses: softprops/action-gh-release@v2
+
+
+      with:
+
+
+        tag_name: testing
+
+
+
+        name: sing-box reF1nd testing
+
+
+
+        body: |
+
+
+          自动同步 reF1nd beta 内核
+
+
+          当前版本:
+
+          ${{ steps.version.outputs.tag }}
+
+
+
+
+
+
+        files: |
+
+
+          sing-box-ref1nd-testing-linux-arm64.tar.gz
+
+          testing-version.txt
