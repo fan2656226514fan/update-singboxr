@@ -1,4 +1,4 @@
-name: Update sing-box reF1nd beta arm64
+name: Update sing-box reF1nd testing arm64
 
 
 on:
@@ -26,7 +26,6 @@ jobs:
     runs-on: ubuntu-latest
 
 
-
     steps:
 
 
@@ -37,8 +36,7 @@ jobs:
 
 
 
-
-    - name: Get latest beta version
+    - name: Get latest testing version
 
       id: version
 
@@ -52,25 +50,25 @@ jobs:
         | jq -r '
           [
             .[]
-            | select(.tag_name | contains("beta"))
+            | select(
+                .tag_name
+                | test("alpha|beta|rc|pre")
+              )
             | .tag_name
           ][0]
         ')
 
 
-
-        echo "beta version: $TAG"
-
+        echo "testing version: $TAG"
 
 
         if [ "$TAG" = "null" ] || [ -z "$TAG" ]; then
 
-          echo "获取 beta 版本失败"
+          echo "获取测试版失败"
 
           exit 1
 
         fi
-
 
 
         echo "tag=$TAG" >> $GITHUB_OUTPUT
@@ -79,9 +77,7 @@ jobs:
 
 
 
-
-
-    - name: Download linux-arm64 beta
+    - name: Download linux-arm64-musl testing
 
       shell: bash
 
@@ -93,33 +89,34 @@ jobs:
         | jq -r '
           [
             .[]
-            | select(.tag_name | contains("beta"))
+            | select(
+                .tag_name
+                | test("alpha|beta|rc|pre")
+              )
             | .assets[]
-            | select(.name | contains("linux-arm64"))
+            | select(
+                .name
+                | contains("linux-arm64-musl.tar.gz")
+              )
             | .browser_download_url
           ][0]
         ')
-
 
 
         echo "download url:"
         echo "$URL"
 
 
-
         if [ "$URL" = "null" ] || [ -z "$URL" ]; then
 
-          echo "没有找到 linux-arm64 beta"
+          echo "没有找到 linux-arm64-musl 测试版"
 
           exit 1
 
         fi
 
 
-
         wget -O source.tar.gz "$URL"
-
-
 
 
 
@@ -177,8 +174,6 @@ jobs:
 
 
 
-
-
     - name: Delete old testing Release
 
       uses: actions/github-script@v7
@@ -218,14 +213,11 @@ jobs:
               });
 
 
-
               console.log("deleted old testing release");
 
             }
 
           }
-
-
 
 
 
@@ -242,7 +234,7 @@ jobs:
         tag_name: testing
 
 
-        name: sing-box reF1nd beta testing
+        name: sing-box reF1nd testing arm64
 
 
         prerelease: true
@@ -251,7 +243,7 @@ jobs:
         body: |
 
 
-          自动同步 reF1nd beta 内核
+          自动同步 reF1nd 测试版内核
 
 
           当前版本:
@@ -261,6 +253,5 @@ jobs:
 
 
         files: |
-
 
           sing-box-ref1nd-testing-linux-arm64.tar.gz
