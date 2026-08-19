@@ -1,0 +1,108 @@
+name: Update sing-box reF1nd arm64
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 2 * * *"
+
+
+permissions:
+  contents: write
+
+
+jobs:
+  update:
+
+    runs-on: ubuntu-latest
+
+
+    steps:
+
+    - name: Checkout
+      uses: actions/checkout@v4
+
+
+    - name: Get latest version
+      id: version
+      run: |
+
+        TAG=$(curl -s \
+        https://api.github.com/repos/reF1nd/sing-box-releases/releases/latest \
+        | grep tag_name \
+        | cut -d '"' -f4)
+
+
+        echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+        echo "最新版本: $TAG"
+
+
+
+    - name: Download linux-arm64 only
+      run: |
+
+        URL=$(curl -s \
+        https://api.github.com/repos/reF1nd/sing-box-releases/releases/latest \
+        | grep browser_download_url \
+        | grep linux-arm64 \
+        | head -1 \
+        | cut -d '"' -f4)
+
+
+        echo "下载地址:"
+        echo $URL
+
+
+        wget -O source.tar.gz "$URL"
+
+
+
+    - name: Repack
+      run: |
+
+        mkdir work
+
+        tar -xzf source.tar.gz -C work
+
+
+        mkdir output
+
+
+        cp $(find work -name sing-box -type f | head -1) \
+        output/sing-box
+
+
+        cd output
+
+
+        tar -czf \
+        ../sing-box-ref1nd-testing-linux-arm64.tar.gz \
+        sing-box
+
+
+
+    - name: Save version
+      run: |
+
+        echo "${{steps.version.outputs.tag}}" \
+        > sing-box-version.txt
+
+
+
+    - name: Commit files
+      run: |
+
+        git config user.name github-actions
+
+        git config user.email github-actions@github.com
+
+
+        git add .
+
+
+        git commit \
+        -m "Update sing-box-ref1nd-testing-linux-arm64 ${{steps.version.outputs.tag}}" \
+        || exit 0
+
+
+        git push
