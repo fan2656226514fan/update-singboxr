@@ -1,240 +1,97 @@
-name: Update sing-box reF1nd beta arm64
-
+name: Update sing-box reF1nd stable arm64
 
 on:
-
   workflow_dispatch:
-
   schedule:
     - cron: "30 2 * * *"
-
 
 permissions:
   contents: write
 
-
-
 jobs:
-
-  testing:
-
+  stable:
     runs-on: ubuntu-latest
-
-
     steps:
-
-
     - name: Checkout
       uses: actions/checkout@v4
 
-
-
-    - name: Get latest beta version
-      id: version
+    - name: Get latest stable version and Download
+      id: fetch
       shell: bash
       run: |
+        # 使用 jq 精确解析最新稳定版信息
+        RELEASE_JSON=$(curl -fsSL https://api.github.com/repos/reF1nd/sing-box-releases/releases | jq '[.[] | select(.tag_name | contains("beta") | not) | select(.tag_name | contains("reF1nd"))][0]')
+        
+        TAG=$(echo "$RELEASE_JSON" | jq -r .tag_name)
+        URL=$(echo "$RELEASE_JSON" | jq -r '.assets[] | select(.name | contains("linux-arm64")) | .browser_download_url')
 
-        TAG=$(curl -fsSL \
-        https://api.github.com/repos/reF1nd/sing-box-releases/releases \
-        | grep '"tag_name"' \
-        | grep reF1nd \
-        | grep beta \
-        | head -1 \
-        | awk -F '"' '{print $4}')
+        echo "stable version: $TAG"
+        echo "download url: $URL"
 
-
-        echo "beta version: $TAG"
-
-
-        if [ -z "$TAG" ]; then
-          echo "获取 beta 版本失败"
+        if [ -z "$TAG" ] || [ "$TAG" == "null" ] || [ -z "$URL" ] || [ "$URL" == "null" ]; then
+          echo "获取版本或下载链接失败"
           exit 1
         fi
-
 
         echo "tag=$TAG" >> $GITHUB_OUTPUT
-
-
-
-
-
-    - name: Download linux-arm64 beta
-      shell: bash
-      run: |
-
-
-        curl -fsSL \
-        https://api.github.com/repos/reF1nd/sing-box-releases/releases \
-        -o releases.json
-
-
-
-        URL=$(python3 <<'PY'
-import json
-
-with open("releases.json") as f:
-    releases=json.load(f)
-
-
-for r in releases:
-
-    if "reF1nd" in r["tag_name"] and "beta" in r["tag_name"]:
-
-        for a in r["assets"]:
-
-            if "linux-arm64" in a["name"]:
-
-                print(a["browser_download_url"])
-                exit()
-
-PY
-)
-
-
-
-        echo "download url:"
-        echo "$URL"
-
-
-
-        if [ -z "$URL" ]; then
-          echo "没有找到 linux-arm64 beta"
-          exit 1
-        fi
-
-
-
         wget -O source.tar.gz "$URL"
-
-
-
-
-
-
 
     - name: Extract and repack
       shell: bash
       run: |
-
-
         rm -rf work output
-
-
-        mkdir work output
-
-
-
+        mkdir -p work output
         tar -xzf source.tar.gz -C work
-
-
-
+        
         BIN=$(find work -name sing-box -type f | head -1)
-
-
-
         if [ ! -f "$BIN" ]; then
-
           echo "没有找到 sing-box"
-
           exit 1
-
         fi
-
-
-
+        
         chmod +x "$BIN"
-
-
-
         cp "$BIN" output/sing-box
+        tar -czf sing-box-ref1nd-stable-linux-arm64.tar.gz -C output sing-box
+        ls -lh sing-box-ref1nd-stable-linux-arm64.tar.gz
 
-
-
-        tar -czf \
-        sing-box-ref1nd-testing-linux-arm64.tar.gz \
-        -C output sing-box
-
-
-
-        ls -lh sing-box-ref1nd-testing-linux-arm64.tar.gz
-
-
-
-
-
-
-
-    - name: Delete old testing Release
+    - name: Delete old stable Release and Tag
       uses: actions/github-script@v7
-
       with:
-
         script: |
-
-
+          // 删除旧的 Release
           const releases = await github.rest.repos.listReleases({
-
             owner: context.repo.owner,
-
             repo: context.repo.repo
-
           });
-
-
           for (const release of releases.data) {
-
-
-            if (release.tag_name === "testing") {
-
-
+            if (release.tag_name === "stable") {
               await github.rest.repos.deleteRelease({
-
                 owner: context.repo.owner,
-
                 repo: context.repo.repo,
-
                 release_id: release.id
-
               });
-
-
-              console.log("deleted old testing release");
-
-
+              console.log("Deleted old stable release");
             }
-
+          }
+          // 删除旧的 Git Tag，避免新 Release 创建冲突
+          try {
+            await github.rest.git.deleteRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: "tags/stable"
+            });
+            console.log("Deleted old stable tag");
+          } catch (error) {
+            console.log("Tag 'stable' not found or already deleted");
           }
 
-
-
-
-
-
-
-    - name: Create testing Release
+    - name: Create stable Release
       uses: softprops/action-gh-release@v2
-
-
       with:
-
-
-        tag_name: testing
-
-
-        name: sing-box reF1nd beta testing
-
-
+        tag_name: stable
+        name: sing-box reF1nd stable
         body: |
-
-          自动同步 reF1nd beta 内核
-
-
-          当前版本:
-
-          ${{ steps.version.outputs.tag }}
-
-
-
+          自动同步 reF1nd 正式版内核
+          当前版本: ${{ steps.fetch.outputs.tag }}
         files: |
-
-          sing-box-ref1nd-testing-linux-arm64.tar.gz
+          sing-box-ref1nd-stable-linux-arm64.tar.gz
