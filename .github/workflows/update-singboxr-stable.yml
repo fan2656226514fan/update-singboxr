@@ -41,6 +41,20 @@ jobs:
 
 
 
+    - name: Debug release list
+
+      shell: bash
+
+      run: |
+
+
+        curl -fsSL \
+        https://api.github.com/repos/reF1nd/sing-box-releases/releases \
+        | grep tag_name
+
+
+
+
 
     - name: Get latest stable version
 
@@ -54,23 +68,24 @@ jobs:
         TAG=$(curl -fsSL \
         https://api.github.com/repos/reF1nd/sing-box-releases/releases \
         | grep '"tag_name"' \
+        | grep reF1nd \
         | grep -v beta \
         | head -1 \
-        | cut -d '"' -f4)
+        | awk -F '"' '{print $4}')
+
+
+
+        echo "stable version: $TAG"
 
 
 
         if [ -z "$TAG" ]; then
 
-          echo "没有找到 stable 版本"
+          echo "获取 stable 版本失败"
 
           exit 1
 
         fi
-
-
-
-        echo "当前 stable: $TAG"
 
 
 
@@ -93,9 +108,16 @@ jobs:
         https://api.github.com/repos/reF1nd/sing-box-releases/releases \
         | grep browser_download_url \
         | grep linux-arm64 \
+        | grep reF1nd \
         | grep -v beta \
         | head -1 \
-        | cut -d '"' -f4)
+        | awk -F '"' '{print $4}')
+
+
+
+        echo "download url:"
+
+        echo "$URL"
 
 
 
@@ -106,10 +128,6 @@ jobs:
           exit 1
 
         fi
-
-
-
-        echo "$URL"
 
 
 
@@ -132,7 +150,9 @@ jobs:
         rm -rf work output
 
 
+
         mkdir work output
+
 
 
 
@@ -142,7 +162,11 @@ jobs:
 
 
 
+
+
         BIN=$(find work -name sing-box -type f | head -1)
+
+
 
 
 
@@ -158,12 +182,18 @@ jobs:
 
 
 
+
+
         chmod +x "$BIN"
 
 
 
 
+
+
         cp "$BIN" output/sing-box
+
+
 
 
 
@@ -176,9 +206,10 @@ jobs:
 
 
 
-        echo "打包完成"
 
         ls -lh sing-box-ref1nd-stable-linux-arm64.tar.gz
+
+
 
 
 
@@ -209,9 +240,7 @@ jobs:
 
 
 
-
           for (const release of releases.data) {
-
 
 
             if (release.tag_name === "stable") {
@@ -230,7 +259,7 @@ jobs:
 
 
 
-              console.log("删除旧 stable Release");
+              console.log("deleted old stable release");
 
             }
 
