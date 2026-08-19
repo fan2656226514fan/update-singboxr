@@ -17,8 +17,6 @@ permissions:
 
 
 
-
-
 jobs:
 
 
@@ -28,31 +26,12 @@ jobs:
     runs-on: ubuntu-latest
 
 
-
     steps:
-
 
 
     - name: Checkout
 
       uses: actions/checkout@v4
-
-
-
-
-
-    - name: Debug release list
-
-      shell: bash
-
-      run: |
-
-
-        curl -fsSL \
-        https://api.github.com/repos/reF1nd/sing-box-releases/releases \
-        | grep tag_name
-
-
 
 
 
@@ -70,23 +49,21 @@ jobs:
         | grep '"tag_name"' \
         | grep reF1nd \
         | grep -v beta \
+        | grep -v alpha \
         | head -1 \
         | awk -F '"' '{print $4}')
-
 
 
         echo "stable version: $TAG"
 
 
-
         if [ -z "$TAG" ]; then
 
-          echo "获取 stable 版本失败"
+          echo "获取正式版失败"
 
           exit 1
 
         fi
-
 
 
         echo "tag=$TAG" >> $GITHUB_OUTPUT
@@ -94,10 +71,7 @@ jobs:
 
 
 
-
-
-
-    - name: Download linux-arm64 stable
+    - name: Download linux-arm64-musl stable
 
       shell: bash
 
@@ -107,36 +81,28 @@ jobs:
         URL=$(curl -fsSL \
         https://api.github.com/repos/reF1nd/sing-box-releases/releases \
         | grep browser_download_url \
-        | grep linux-arm64 \
+        | grep linux-arm64-musl.tar.gz \
         | grep reF1nd \
         | grep -v beta \
+        | grep -v alpha \
         | head -1 \
         | awk -F '"' '{print $4}')
 
 
-
         echo "download url:"
-
         echo "$URL"
-
 
 
         if [ -z "$URL" ]; then
 
-          echo "没有找到 linux-arm64 stable"
+          echo "没有找到 linux-arm64-musl 正式版"
 
           exit 1
 
         fi
 
 
-
         wget -O source.tar.gz "$URL"
-
-
-
-
-
 
 
 
@@ -150,10 +116,7 @@ jobs:
         rm -rf work output
 
 
-
         mkdir work output
-
-
 
 
 
@@ -161,13 +124,7 @@ jobs:
 
 
 
-
-
-
         BIN=$(find work -name sing-box -type f | head -1)
-
-
-
 
 
 
@@ -181,20 +138,11 @@ jobs:
 
 
 
-
-
-
         chmod +x "$BIN"
 
 
 
-
-
-
         cp "$BIN" output/sing-box
-
-
-
 
 
 
@@ -204,16 +152,7 @@ jobs:
 
 
 
-
-
-
         ls -lh sing-box-ref1nd-stable-linux-arm64.tar.gz
-
-
-
-
-
-
 
 
 
@@ -246,7 +185,6 @@ jobs:
             if (release.tag_name === "stable") {
 
 
-
               await github.rest.repos.deleteRelease({
 
                 owner: context.repo.owner,
@@ -258,15 +196,11 @@ jobs:
               });
 
 
-
               console.log("deleted old stable release");
 
             }
 
           }
-
-
-
 
 
 
@@ -282,9 +216,7 @@ jobs:
         tag_name: stable
 
 
-
-        name: sing-box reF1nd stable
-
+        name: sing-box reF1nd stable arm64
 
 
         body: |
@@ -299,10 +231,6 @@ jobs:
 
 
 
-
-
-
         files: |
-
 
           sing-box-ref1nd-stable-linux-arm64.tar.gz
