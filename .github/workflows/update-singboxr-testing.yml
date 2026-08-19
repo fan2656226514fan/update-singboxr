@@ -18,6 +18,7 @@ permissions:
 
 
 
+
 jobs:
 
 
@@ -68,12 +69,11 @@ jobs:
 
 
 
-        echo "最新 beta: $TAG"
+        echo "当前 beta: $TAG"
 
 
 
         echo "tag=$TAG" >> $GITHUB_OUTPUT
-
 
 
 
@@ -106,8 +106,6 @@ jobs:
 
 
 
-        echo "下载地址:"
-
         echo "$URL"
 
 
@@ -130,14 +128,12 @@ jobs:
         rm -rf work output
 
 
-
         mkdir work output
 
 
 
 
         tar -xzf source.tar.gz -C work
-
 
 
 
@@ -149,7 +145,7 @@ jobs:
 
         if [ ! -f "$BIN" ]; then
 
-          echo "未找到 sing-box"
+          echo "没有找到 sing-box"
 
           exit 1
 
@@ -163,26 +159,7 @@ jobs:
 
 
 
-        echo "内核信息:"
-
-        file "$BIN"
-
-
-
-
-
-        # 删除旧 beta 文件
-
-        rm -f sing-box-ref1nd-testing-linux-arm64.tar.gz
-
-
-
-
-
-
         cp "$BIN" output/sing-box
-
-
 
 
 
@@ -195,58 +172,9 @@ jobs:
 
 
 
+        echo "打包完成"
+
         ls -lh sing-box-ref1nd-testing-linux-arm64.tar.gz
-
-
-
-
-
-
-
-
-    - name: Save version
-
-      shell: bash
-
-      run: |
-
-
-        echo "${{ steps.version.outputs.tag }}" \
-        > testing-version.txt
-
-
-
-
-
-
-
-    - name: Commit update
-
-      shell: bash
-
-      run: |
-
-
-        git config user.name github-actions
-
-        git config user.email github-actions@github.com
-
-
-
-
-        git add .
-
-
-
-
-        git commit \
-        -m "Update testing ${{ steps.version.outputs.tag }}" \
-        || exit 0
-
-
-
-
-        git push
 
 
 
@@ -273,7 +201,6 @@ jobs:
             repo: context.repo.repo
 
           });
-
 
 
 
@@ -344,5 +271,3 @@ jobs:
 
 
           sing-box-ref1nd-testing-linux-arm64.tar.gz
-
-          testing-version.txt
