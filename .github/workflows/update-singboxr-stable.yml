@@ -1,33 +1,55 @@
 name: Update sing-box reF1nd stable arm64
 
+
 on:
+
   workflow_dispatch:
+
   schedule:
-    - cron: "0 3 * * *"
+
+    - cron: "30 2 * * *"
+
 
 
 permissions:
+
   contents: write
+
+
+
 
 
 jobs:
 
+
   stable:
 
+
     runs-on: ubuntu-latest
+
 
 
     steps:
 
 
+
     - name: Checkout
+
       uses: actions/checkout@v4
 
 
 
-    - name: Get stable release
+
+
+
+    - name: Get latest stable version
+
       id: version
+
+      shell: bash
+
       run: |
+
 
         TAG=$(curl -fsSL \
         https://api.github.com/repos/reF1nd/sing-box-releases/releases \
@@ -37,15 +59,35 @@ jobs:
         | cut -d '"' -f4)
 
 
-        echo "stable=$TAG"
+
+        if [ -z "$TAG" ]; then
+
+          echo "没有找到 stable 版本"
+
+          exit 1
+
+        fi
+
+
+
+        echo "当前 stable: $TAG"
+
+
 
         echo "tag=$TAG" >> $GITHUB_OUTPUT
 
 
 
-    - name: Download linux-arm64
+
+
+
+
+    - name: Download linux-arm64 stable
+
+      shell: bash
 
       run: |
+
 
         URL=$(curl -fsSL \
         https://api.github.com/repos/reF1nd/sing-box-releases/releases \
@@ -56,24 +98,74 @@ jobs:
         | cut -d '"' -f4)
 
 
+
+        if [ -z "$URL" ]; then
+
+          echo "没有找到 linux-arm64 stable"
+
+          exit 1
+
+        fi
+
+
+
+        echo "$URL"
+
+
+
         wget -O source.tar.gz "$URL"
 
 
 
-    - name: Pack
+
+
+
+
+
+    - name: Extract and repack
+
+      shell: bash
 
       run: |
 
+
+        rm -rf work output
+
+
         mkdir work output
+
+
 
 
         tar -xzf source.tar.gz -C work
 
 
+
+
         BIN=$(find work -name sing-box -type f | head -1)
 
 
+
+
+        if [ ! -f "$BIN" ]; then
+
+          echo "没有找到 sing-box"
+
+          exit 1
+
+        fi
+
+
+
+
+        chmod +x "$BIN"
+
+
+
+
         cp "$BIN" output/sing-box
+
+
 
 
         tar -czf \
@@ -82,48 +174,106 @@ jobs:
 
 
 
-    - name: Save version
-
-      run: |
-
-        echo "${{steps.version.outputs.tag}}" \
-        > stable-version.txt
 
 
+        echo "打包完成"
 
-    - name: Commit
-
-      run: |
-
-        git config user.name github-actions
-
-        git config user.email github-actions@github.com
-
-
-        git add .
-
-
-        git commit \
-        -m "Update stable ${{steps.version.outputs.tag}}" \
-        || exit 0
-
-
-        git push
+        ls -lh sing-box-ref1nd-stable-linux-arm64.tar.gz
 
 
 
-    - name: Release stable
 
-      uses: softprops/action-gh-release@v2
+
+
+
+
+    - name: Delete old stable Release
+
+      uses: actions/github-script@v7
+
 
       with:
 
+
+        script: |
+
+
+          const releases =
+          await github.rest.repos.listReleases({
+
+            owner: context.repo.owner,
+
+            repo: context.repo.repo
+
+          });
+
+
+
+
+          for (const release of releases.data) {
+
+
+
+            if (release.tag_name === "stable") {
+
+
+
+              await github.rest.repos.deleteRelease({
+
+                owner: context.repo.owner,
+
+                repo: context.repo.repo,
+
+                release_id: release.id
+
+              });
+
+
+
+              console.log("删除旧 stable Release");
+
+            }
+
+          }
+
+
+
+
+
+
+
+    - name: Create stable Release
+
+      uses: softprops/action-gh-release@v2
+
+
+      with:
+
+
         tag_name: stable
+
+
 
         name: sing-box reF1nd stable
 
+
+
+        body: |
+
+
+          自动同步 reF1nd 正式版内核
+
+
+          当前版本:
+
+          ${{ steps.version.outputs.tag }}
+
+
+
+
+
+
         files: |
 
-          sing-box-ref1nd-stable-linux-arm64.tar.gz
 
-          stable-version.txt
+          sing-box-ref1nd-stable-linux-arm64.tar.gz
