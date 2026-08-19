@@ -1,4 +1,4 @@
-name: Update sing-box reF1nd testing arm64
+name: Update sing-box reF1nd beta arm64
 
 
 on:
@@ -6,22 +6,17 @@ on:
   workflow_dispatch:
 
   schedule:
-
-    - cron: "0 2 * * *"
-
+    - cron: "30 2 * * *"
 
 
 permissions:
-
   contents: write
 
 
 
 jobs:
 
-
   testing:
-
 
     runs-on: ubuntu-latest
 
@@ -30,55 +25,31 @@ jobs:
 
 
     - name: Checkout
-
       uses: actions/checkout@v4
 
 
 
     - name: Get latest beta version
-
       id: version
-
       shell: bash
-
       run: |
 
-
-        curl -fsSL \
+        TAG=$(curl -fsSL \
         https://api.github.com/repos/reF1nd/sing-box-releases/releases \
-        -o releases.json
+        | grep '"tag_name"' \
+        | grep reF1nd \
+        | grep beta \
+        | head -1 \
+        | awk -F '"' '{print $4}')
 
 
-
-        TAG=$(python3 - <<'PY'
-import json
-
-with open("releases.json") as f:
-    releases=json.load(f)
-
-for r in releases:
-    tag=r["tag_name"]
-
-    if "reF1nd" in tag and "beta" in tag:
-        print(tag)
-        break
-PY
-)
-
-
-
-        echo "Latest beta: $TAG"
-
+        echo "beta version: $TAG"
 
 
         if [ -z "$TAG" ]; then
-
-          echo "没有找到 beta 版本"
-
+          echo "获取 beta 版本失败"
           exit 1
-
         fi
-
 
 
         echo "tag=$TAG" >> $GITHUB_OUTPUT
@@ -88,13 +59,17 @@ PY
 
 
     - name: Download linux-arm64 beta
-
       shell: bash
-
       run: |
 
 
-        URL=$(python3 - <<'PY'
+        curl -fsSL \
+        https://api.github.com/repos/reF1nd/sing-box-releases/releases \
+        -o releases.json
+
+
+
+        URL=$(python3 <<'PY'
 import json
 
 with open("releases.json") as f:
@@ -107,30 +82,24 @@ for r in releases:
 
         for a in r["assets"]:
 
-            name=a["name"]
-
-            if "linux-arm64" in name:
+            if "linux-arm64" in a["name"]:
 
                 print(a["browser_download_url"])
-
                 exit()
+
 PY
 )
 
 
 
-        echo "Download:"
-
+        echo "download url:"
         echo "$URL"
 
 
 
         if [ -z "$URL" ]; then
-
-            echo "找不到 linux-arm64 beta"
-
-            exit 1
-
+          echo "没有找到 linux-arm64 beta"
+          exit 1
         fi
 
 
@@ -144,14 +113,11 @@ PY
 
 
     - name: Extract and repack
-
       shell: bash
-
       run: |
 
 
         rm -rf work output
-
 
 
         mkdir work output
@@ -162,15 +128,15 @@ PY
 
 
 
-        BIN=$(find work -type f -name sing-box | head -1)
+        BIN=$(find work -name sing-box -type f | head -1)
 
 
 
         if [ ! -f "$BIN" ]; then
 
-            echo "没有找到 sing-box"
+          echo "没有找到 sing-box"
 
-            exit 1
+          exit 1
 
         fi
 
@@ -198,9 +164,7 @@ PY
 
 
 
-
     - name: Delete old testing Release
-
       uses: actions/github-script@v7
 
       with:
@@ -208,8 +172,7 @@ PY
         script: |
 
 
-          const releases =
-          await github.rest.repos.listReleases({
+          const releases = await github.rest.repos.listReleases({
 
             owner: context.repo.owner,
 
@@ -218,11 +181,10 @@ PY
           });
 
 
+          for (const release of releases.data) {
 
-          for (const r of releases.data) {
 
-
-            if (r.tag_name === "testing") {
+            if (release.tag_name === "testing") {
 
 
               await github.rest.repos.deleteRelease({
@@ -231,12 +193,13 @@ PY
 
                 repo: context.repo.repo,
 
-                release_id: r.id
+                release_id: release.id
 
               });
 
 
               console.log("deleted old testing release");
+
 
             }
 
@@ -248,10 +211,7 @@ PY
 
 
 
-
-
     - name: Create testing Release
-
       uses: softprops/action-gh-release@v2
 
 
@@ -261,7 +221,7 @@ PY
         tag_name: testing
 
 
-        name: sing-box reF1nd testing
+        name: sing-box reF1nd beta testing
 
 
         body: |
